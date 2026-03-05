@@ -203,6 +203,86 @@ with tab_backtest:
                     lambda x: ", ".join(x[:10]) + ("..." if len(x) > 10 else ""))
                 st.dataframe(pos_display, use_container_width=True)
 
+            # ── Export section ──
+            st.divider()
+            st.subheader("Export Results")
+
+            export_col1, export_col2, export_col3 = st.columns(3)
+
+            # 1. Copy-paste text summary
+            summary_lines = [
+                f"Quality/Value Backtest — {start_date} to {end_date}",
+                f"P/B<{pb_pct:.0%} | F>={min_fscore} | N={n_stocks} | Reb={rebalance_freq}mo | TC={tx_cost:.2%}",
+                "",
+            ]
+            for k, v in metrics.items():
+                label = k.replace("_", " ").title()
+                if k in ["total_return", "cagr", "volatility_ann", "max_drawdown", "win_rate"]:
+                    summary_lines.append(f"{label}: {v:.2%}")
+                elif k in ["max_dd_duration_periods", "n_trades"]:
+                    summary_lines.append(f"{label}: {v:.0f}")
+                elif isinstance(v, float) and not np.isnan(v):
+                    summary_lines.append(f"{label}: {v:.2f}")
+                else:
+                    summary_lines.append(f"{label}: N/A")
+            if len(positions) > 0:
+                last = positions.iloc[-1]
+                summary_lines.append(f"\nLast rebalance: {last['date'].strftime('%Y-%m-%d')}")
+                summary_lines.append(f"Holdings ({last['n_holdings']}): {', '.join(last['tickers'])}")
+            summary_text = "\n".join(summary_lines)
+
+            with export_col1:
+                st.text_area("Copy summary", summary_text, height=300, key="copy_summary")
+
+            # 2. Download equity curve CSV
+            with export_col2:
+                eq_df = equity_curve.reset_index()
+                eq_df.columns = ["date", "portfolio_value"]
+                st.download_button(
+                    "Download Equity Curve (.csv)",
+                    eq_df.to_csv(index=False),
+                    file_name="equity_curve.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+                # Download metrics CSV
+                metrics_df = pd.DataFrame([metrics])
+                metrics_df.insert(0, "start_date", str(start_date))
+                metrics_df.insert(1, "end_date", str(end_date))
+                metrics_df.insert(2, "pb_pct", pb_pct)
+                metrics_df.insert(3, "min_fscore", min_fscore)
+                metrics_df.insert(4, "n_stocks", n_stocks)
+                metrics_df.insert(5, "rebalance_months", rebalance_freq)
+                metrics_df.insert(6, "tx_cost", tx_cost)
+                st.download_button(
+                    "Download Metrics (.csv)",
+                    metrics_df.to_csv(index=False),
+                    file_name="backtest_metrics.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+
+            # 3. Download trades + positions
+            with export_col3:
+                if len(trades) > 0:
+                    st.download_button(
+                        "Download Trades (.csv)",
+                        trades.to_csv(index=False),
+                        file_name="trades.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                if len(positions) > 0:
+                    pos_export = positions.copy()
+                    pos_export["tickers"] = pos_export["tickers"].apply(lambda x: ", ".join(x))
+                    st.download_button(
+                        "Download Positions (.csv)",
+                        pos_export.to_csv(index=False),
+                        file_name="positions.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+
 
 # ══════════════════════════════════════════════════════════════
 # TAB 2: PARAMETER OPTIMIZATION
