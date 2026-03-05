@@ -92,12 +92,13 @@ with tab_backtest:
 
         with col_settings:
             st.subheader("Backtest Settings")
-            start_date = st.date_input("Start date", pd.Timestamp("2015-01-01"), key="bt_start")
-            end_date = st.date_input("End date", pd.Timestamp("2022-12-31"), key="bt_end")
+            start_date = st.date_input("Start date", pd.Timestamp("2022-01-01"), key="bt_start")
+            end_date = st.date_input("End date", pd.Timestamp("2025-12-31"), key="bt_end")
             tx_cost = st.slider("Transaction cost (%)", 0.0, 1.0, 0.1, 0.05, key="bt_tc") / 100
             risk_free = st.slider("Risk-free rate (%)", 0.0, 10.0, 2.0, 0.5, key="bt_rf") / 100
             initial_capital = st.number_input("Initial capital ($)", value=100_000, step=10_000, key="bt_cap")
-            pub_lag = st.slider("Publication lag (months)", 0, 6, 3, 1, key="bt_lag")
+            pub_lag = st.slider("Publication lag (months)", 0, 6, 0, 1, key="bt_lag",
+                                help="Set to 0 if data_download.py already added the lag")
 
         # Apply from optimization results
         if "apply_params" in st.session_state and st.session_state["apply_params"] is not None:

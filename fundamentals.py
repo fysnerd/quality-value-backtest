@@ -21,43 +21,54 @@ def compute_pb(df_funda: pd.DataFrame, pb_col: str = "pb") -> pd.DataFrame:
 
 def compute_f_score(df_funda: pd.DataFrame, f_score_col: str = "f_score") -> pd.DataFrame:
     """Compute Piotroski F-Score (0-9) from component columns.
-    If f_score_col already exists, return as-is.
+    If f_score_col exists but has NaN rows, recalculates those from components.
+    If no components available, returns as-is.
 
-    Required component columns (if computing from scratch):
+    Component columns:
         roa, roa_prev, cfo, delta_leverage, delta_current_ratio,
         shares_issued, delta_gross_margin, delta_asset_turnover
     """
-    if f_score_col in df_funda.columns:
-        return df_funda
-
-    required = [
+    components = [
         "roa", "roa_prev", "cfo", "delta_leverage",
         "delta_current_ratio", "shares_issued",
         "delta_gross_margin", "delta_asset_turnover",
     ]
-    missing = set(required) - set(df_funda.columns)
-    if missing:
-        raise ValueError(f"Missing columns to compute F-Score: {missing}")
+    has_components = all(c in df_funda.columns for c in components)
+
+    # If column exists and is fully populated, nothing to do
+    if f_score_col in df_funda.columns and df_funda[f_score_col].notna().all():
+        return df_funda
+
+    # If no components to compute from, return as-is
+    if not has_components:
+        return df_funda
 
     df = df_funda.copy()
 
-    # Profitability (4 points)
-    df["_f1_roa"] = (df["roa"] > 0).astype(int)
-    df["_f2_cfo"] = (df["cfo"] > 0).astype(int)
-    df["_f3_delta_roa"] = (df["roa"] > df["roa_prev"]).astype(int)
-    df["_f4_accrual"] = (df["cfo"] > df["roa"]).astype(int)
-
-    # Leverage / Liquidity (3 points)
-    df["_f5_leverage"] = (df["delta_leverage"] < 0).astype(int)
-    df["_f6_liquidity"] = (df["delta_current_ratio"] > 0).astype(int)
-    df["_f7_dilution"] = (df["shares_issued"] == 0).astype(int)
-
-    # Operating efficiency (2 points)
-    df["_f8_margin"] = (df["delta_gross_margin"] > 0).astype(int)
-    df["_f9_turnover"] = (df["delta_asset_turnover"] > 0).astype(int)
+    # Compute from components
+    df["_f1_roa"] = (df["roa"] > 0).astype(float).where(df["roa"].notna())
+    df["_f2_cfo"] = (df["cfo"] > 0).astype(float).where(df["cfo"].notna())
+    df["_f3_delta_roa"] = (df["roa"] > df["roa_prev"]).astype(float).where(
+        df["roa"].notna() & df["roa_prev"].notna())
+    df["_f4_accrual"] = (df["cfo"] > df["roa"]).astype(float).where(
+        df["cfo"].notna() & df["roa"].notna())
+    df["_f5_leverage"] = (df["delta_leverage"] < 0).astype(float).where(df["delta_leverage"].notna())
+    df["_f6_liquidity"] = (df["delta_current_ratio"] > 0).astype(float).where(df["delta_current_ratio"].notna())
+    df["_f7_dilution"] = (df["shares_issued"] == 0).astype(float)
+    df["_f8_margin"] = (df["delta_gross_margin"] > 0).astype(float).where(df["delta_gross_margin"].notna())
+    df["_f9_turnover"] = (df["delta_asset_turnover"] > 0).astype(float).where(df["delta_asset_turnover"].notna())
 
     f_cols = [c for c in df.columns if c.startswith("_f")]
-    df[f_score_col] = df[f_cols].sum(axis=1)
-    df = df.drop(columns=f_cols)
+    computed = df[f_cols].sum(axis=1)
+    n_valid = df[f_cols].notna().sum(axis=1)
+    # Only assign if at least 5 of 9 components are available
+    computed = computed.where(n_valid >= 5)
 
+    # Fill NaN f_score with computed values (preserve existing non-NaN)
+    if f_score_col in df.columns:
+        df[f_score_col] = df[f_score_col].fillna(computed)
+    else:
+        df[f_score_col] = computed
+
+    df = df.drop(columns=f_cols)
     return df

@@ -24,10 +24,37 @@ class BacktestParams:
             self.selection = SelectionParams()
 
 
-def _generate_rebalance_dates(start: pd.Timestamp, end: pd.Timestamp, freq_months: int) -> list[pd.Timestamp]:
-    """Generate month-end rebalancing dates."""
-    dates = pd.date_range(start, end, freq="ME", tz="UTC")
-    return [d for d in dates[::freq_months]]
+def _generate_rebalance_dates(
+    start: pd.Timestamp, end: pd.Timestamp, freq_months: int,
+    available_dates: list | None = None,
+) -> list[pd.Timestamp]:
+    """Generate rebalancing dates aligned with available price dates.
+    If available_dates is provided, snaps to the closest available date.
+    """
+    # Generate candidate dates at month-end
+    candidates = pd.date_range(start, end, freq="ME", tz="UTC")[::freq_months]
+
+    if available_dates is None or len(available_dates) == 0:
+        return list(candidates)
+
+    available = sorted(available_dates)
+    snapped = []
+    for c in candidates:
+        # Find closest available date (prefer <= candidate, else next one)
+        before = [d for d in available if d <= c]
+        after = [d for d in available if d > c]
+        if before:
+            snapped.append(before[-1])
+        elif after:
+            snapped.append(after[0])
+    # Remove duplicates while preserving order
+    seen = set()
+    result = []
+    for d in snapped:
+        if d not in seen:
+            seen.add(d)
+            result.append(d)
+    return result
 
 
 def run_backtest(
@@ -59,7 +86,7 @@ def run_backtest(
     ]
     all_dates = sorted(price_dates["date"].unique())
 
-    rebalance_dates = _generate_rebalance_dates(start, end, params.rebalance_freq_months)
+    rebalance_dates = _generate_rebalance_dates(start, end, params.rebalance_freq_months, all_dates)
 
     # State
     capital = params.initial_capital
