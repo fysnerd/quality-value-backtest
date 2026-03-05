@@ -35,8 +35,14 @@ def compute_performance_metrics(
     returns = equity_curve.pct_change().dropna()
     r = returns.values
 
-    # CAGR
-    n_years = len(equity_curve) / N
+    # CAGR — use actual calendar dates for accuracy
+    if hasattr(equity_curve.index, 'dtype') and len(equity_curve) >= 2:
+        try:
+            n_years = (equity_curve.index[-1] - equity_curve.index[0]).days / 365.25
+        except (TypeError, AttributeError):
+            n_years = len(equity_curve) / N
+    else:
+        n_years = len(equity_curve) / N
     cagr = (V[-1] / V[0]) ** (1 / n_years) - 1 if n_years > 0 and V[0] > 0 else 0.0
 
     # Annualized volatility

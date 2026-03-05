@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass
 from selection import SelectionParams, select_quality_value_universe
-from fundamentals import compute_pb, compute_f_score
+from fundamentals import compute_pb, compute_f_score, compute_q_score
 from metrics import compute_performance_metrics, MetricsParams
 
 
@@ -75,7 +75,8 @@ def run_backtest(
 
     # Prepare fundamentals
     df_funda = compute_pb(df_funda)
-    df_funda = compute_f_score(df_funda)
+    df_funda = compute_f_score(df_funda, min_components=3, scale_partial=True)
+    df_funda = compute_q_score(df_funda)
 
     start = pd.Timestamp(params.start_date, tz="UTC")
     end = pd.Timestamp(params.end_date, tz="UTC")

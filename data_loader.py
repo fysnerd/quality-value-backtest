@@ -102,12 +102,7 @@ def generate_synthetic_data(
                 "shares_issued": int(rng.choice([0, 1], p=[0.7, 0.3])),
                 "delta_gross_margin": round(rng.uniform(-0.1, 0.1), 4),
                 "delta_asset_turnover": round(rng.uniform(-0.1, 0.1), 4),
-                "f_score": f_score,
-                "pb": pb,
-                "market_cap": mcap,
             })
     df_funda = pd.DataFrame(rows_funda)
-    # deduplicate columns from dict overwrite
-    df_funda = df_funda.loc[:, ~df_funda.columns.duplicated()]
 
     return df_prices, df_funda

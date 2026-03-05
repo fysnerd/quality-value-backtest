@@ -14,8 +14,23 @@ def load_benchmark(path: str, date_col: str = "date", value_col: str = "close") 
 
 
 def align_series(series_dict: dict[str, pd.Series]) -> pd.DataFrame:
-    """Align multiple series to a common date index (inner join)."""
-    df = pd.DataFrame(series_dict)
+    """Align multiple series to a common date index.
+    Uses forward-fill + nearest reindex to handle frequency mismatches
+    (e.g. monthly SPY vs monthly strategy with different day-of-month).
+    """
+    # Find the series with the most points as the reference index
+    ref_name = max(series_dict, key=lambda k: len(series_dict[k]))
+    ref_index = series_dict[ref_name].index
+
+    aligned = {}
+    for name, s in series_dict.items():
+        if name == ref_name:
+            aligned[name] = s
+        else:
+            # Reindex to reference using nearest match (tolerance 15 days for monthly data)
+            aligned[name] = s.reindex(ref_index, method="nearest", tolerance=pd.Timedelta("15D"))
+
+    df = pd.DataFrame(aligned)
     df = df.dropna()
     return df
 
